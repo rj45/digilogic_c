@@ -1,6 +1,6 @@
 # digilogic
 
-This is the C version of (digilogic)[https://github.com/rj45/digilogic].
+This is the C version of [digilogic](https://github.com/rj45/digilogic).
 
 ** THIS VERSION IS NO LONGER BEING DEVELOPED **
 
