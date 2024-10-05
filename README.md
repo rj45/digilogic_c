@@ -1,18 +1,10 @@
 # digilogic
 
-- Initially (MVP) just a circuit diagram editor
-- With the following features:
-    - Wire auto-routing
-    - Alignment based snapping (rather than grid based)
-    - First class dark mode support
-    - Cross platform (Windows, Mac, Linux, iOS, Android)
-    - Native C (with some Rust), and light weight
-    - Fast background autosave with auto-restore after crash
-- Inspirations:
-    - Issie (github.com/tomcl/issie)
-    - Digital Logic Sim (github.com/SebLague/Digital-Logic-Sim)
-    - Digital (github.com/hneemann/Digital)
-    - LogiSim Evolution (github.com/logisim-evolution/logisim-evolution)
+This is the C version of (digilogic)[https://github.com/rj45/digilogic].
+
+** THIS VERSION IS NO LONGER BEING DEVELOPED **
+
+We switched to Rust from C. Mainly because building C is hard (especially when you support multiple platforms), and dependency management was taking a lot of time (especially getting things to build). Rust is annoyingly complex, but `cargo` is so damn good, the complexity seems worth it.
 
 ## Building
 
