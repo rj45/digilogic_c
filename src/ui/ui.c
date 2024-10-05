@@ -135,7 +135,7 @@ static void ui_menu_bar(CircuitUI *ui, struct nk_context *ctx, float width) {
             strncat(savefile, ".dlc", 1024);
           }
 
-          ui_background_save(ui, savefile, false);
+          circ_save_file(&ui->ux.view.circuit, savefile);
         }
       }
       if (nk_menu_item_label(ctx, "Quit", NK_TEXT_LEFT)) {
