@@ -16,7 +16,7 @@
 const std = @import("std");
 const zcc = @import("compile_commands");
 const globlin = @import("globlin");
-const crab = @import("build.crab");
+const crab = @import("build_crab");
 
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
@@ -26,20 +26,26 @@ pub fn build(b: *std.Build) void {
 
     const digilogic = b.addExecutable(.{
         .name = "digilogic",
-        .target = target,
-        .optimize = optimize,
+        .root_module = b.createModule(.{
+            .target = target,
+            .optimize = optimize,
+        }),
     });
 
     const digilogic_test = b.addExecutable(.{
         .name = "test",
-        .target = target,
-        .optimize = optimize,
+        .root_module = b.createModule(.{
+            .target = target,
+            .optimize = optimize,
+        }),
     });
 
     const digilogic_bench = b.addExecutable(.{
         .name = "bench",
-        .target = target,
-        .optimize = optimize,
+        .root_module = b.createModule(.{
+            .target = target,
+            .optimize = optimize,
+        }),
     });
 
     const Sanitizer = enum {
@@ -53,7 +59,7 @@ pub fn build(b: *std.Build) void {
     };
     const sanitizer = b.option(Sanitizer, "sanitize", "Specify which sanitizer to use on linux in debug mode") orelse .address;
 
-    var cflags = std.ArrayList([]const u8).init(b.allocator);
+    var cflags = std.array_list.Managed([]const u8).init(b.allocator);
     cflags.append("-std=gnu11") catch @panic("OOM");
 
     if (optimize == .Debug) {
@@ -169,7 +175,9 @@ pub fn build(b: *std.Build) void {
     // complile src/gen.c to generate C code
     const asset_gen = b.addExecutable(.{
         .name = "gen",
-        .target = b.host,
+        .root_module = b.createModule(.{
+            .target = b.graph.host,
+        }),
     });
     asset_gen.addCSourceFile(.{
         .file = b.path("src/gen.c"),
@@ -220,7 +228,7 @@ pub fn build(b: *std.Build) void {
     if (target.result.os.tag.isDarwin()) {
         // add apple.m (a copy of nonapple.c) to the build
         // this is required in order for the file to be compiled as Objective-C
-        var mflags2 = std.ArrayList([]const u8).init(b.allocator);
+        var mflags2 = std.array_list.Managed([]const u8).init(b.allocator);
         mflags2.append("-ObjC") catch @panic("OOM");
         mflags2.append("-fobjc-arc") catch @panic("OOM");
         mflags2.appendSlice(cflags.items) catch @panic("OOM");
@@ -366,16 +374,20 @@ pub fn build(b: *std.Build) void {
         }
     }
 
-    const rust_lib_path = crab.addRustStaticlib(b, .{
-        .name = if (target.result.os.tag == .windows) "digilogic_routing.lib" else "libdigilogic_routing.a",
-        .manifest_path = b.path("thirdparty/routing/Cargo.toml"),
-        .target = .{ .zig = target },
-        .profile = crab.Profile.fromOptimizeMode(optimize),
-        .cargo_args = &.{},
-    });
+    const crate_artifacts = crab.addCargoBuild(
+        b,
+        .{
+            .manifest_path = b.path("thirdparty/routing/Cargo.toml"),
+            .cargo_args = &.{},
+        },
+        .{
+            .optimize = optimize,
+            .target = target,
+        },
+    );
 
     inline for ([_]*std.Build.Step.Compile{ digilogic, digilogic_test, digilogic_bench }) |exe| {
-        exe.addLibraryPath(rust_lib_path.dirname());
+        exe.addLibraryPath(crate_artifacts);
         exe.linkSystemLibrary("digilogic_routing");
     }
 
@@ -429,14 +441,22 @@ pub fn build(b: *std.Build) void {
     const bench_step = b.step("bench", "Build and run benchmarks");
     bench_step.dependOn(&bench_run.step);
 
-    zcc.createStep(b, "cdb", .{ .targets = &.{ digilogic, digilogic_test, asset_gen } });
+    var targets = std.ArrayList(*std.Build.Step.Compile){};
+    targets.append(b.allocator, digilogic) catch @panic("OOM");
+    targets.append(b.allocator, digilogic_test) catch @panic("OOM");
+    targets.append(b.allocator, digilogic_bench) catch @panic("OOM");
+
+    _ = zcc.createStep(b, "cdb", targets.toOwnedSlice(b.allocator) catch @panic("OOM"));
 }
 
 fn build_nfd(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) *std.Build.Step.Compile {
-    const nfd = b.addStaticLibrary(.{
+    const nfd = b.addLibrary(.{
         .name = "nfd",
-        .target = target,
-        .optimize = optimize,
+        .linkage = .static,
+        .root_module = b.createModule(.{
+            .target = target,
+            .optimize = optimize,
+        }),
     });
 
     const cflags = &.{
@@ -495,7 +515,7 @@ fn find_llvm_lib_path(b: *std.Build) ?[]const u8 {
     var base_path: []const u8 = undefined;
     var glob_pattern: []const u8 = undefined;
 
-    if (b.host.result.os.tag.isDarwin()) {
+    if (b.graph.host.result.os.tag.isDarwin()) {
         glob_pattern = b.fmt("llvm@{}/*/lib/clang/*/lib/darwin", .{llvm_version});
         const result = std.process.Child.run(.{
             .allocator = b.allocator,
@@ -511,7 +531,7 @@ fn find_llvm_lib_path(b: *std.Build) ?[]const u8 {
             else => return null,
         }
         base_path = std.mem.trim(u8, result.stdout, &std.ascii.whitespace);
-    } else if (b.host.result.os.tag == .windows) {
+    } else if (b.graph.host.result.os.tag == .windows) {
         return null;
     } else {
         glob_pattern = b.fmt("llvm-{}/lib/clang/*/lib/linux", .{llvm_version});

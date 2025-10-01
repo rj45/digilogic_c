@@ -1,0 +1,20 @@
+.{
+    .name = .freetype,
+    .version = "0.0.0",
+    .fingerprint = 0xac2059b60fabd240,
+    .paths = .{
+        "include",
+        "src",
+        "build.zig",
+        "build.zig.zon",
+        "LICENSE.txt",
+        "README.md",
+        "update.sh",
+        "verify.sh",
+    },
+    .dependencies = .{
+        .brotli = .{
+            .path = "../brotli",
+        },
+    },
+}

@@ -1,24 +1,23 @@
 .{
-    .name = "digilogic",
+    .name = .digilogic,
     .version = "0.0.20",
-    .minimum_zig_version = "0.12.0",
+    .fingerprint = 0x5b5313dfd9eb08ea,
+    .minimum_zig_version = "0.15.1",
     .paths = .{""},
     .dependencies = .{
         .freetype = .{
-            .url = "git+https://github.com/bcrist/freetype#96a5d0239b6e96e738bebb8eb09462702d719248",
-            .hash = "1220aafed3b81307647d3d1fe84accb6cbd5a274e2eaac1f75aa47efedef917b00c9",
-        },
-        .compile_commands = .{
-            .url = "git+https://github.com/bcrist/zig-compile-commands#a64abd947b58655f118884709d939645871e94fc",
-            .hash = "1220d3150db10226f4d853eb519468de5c49cb820f08c722608a500b9f7d64e4c780",
+            .path = "zig-build/freetype",
         },
         .globlin = .{
-            .url = "git+https://github.com/bcrist/globlin#5232937d014b63fc1d7e53a7a8751306696a64f1",
-            .hash = "12208be74c8d4d86a323ba371a0e063dc87f9d4ce2b7c2b7e745e3bce99487ec11c7",
+            .path = "zig-build/globlin",
         },
-        .@"build.crab" = .{
-            .url = "git+https://github.com/bcrist/build.crab#1499af8cf2c25ad00b025928516b9f67898340e3",
-            .hash = "1220f776f9ebf467e269cbe8aefb6a5c4401dea8912d241eef25d8d46361762073f3",
+        .build_crab = .{
+            .url = "git+https://github.com/akarpovskii/build.crab#02ffb1e8f4c72e75289614cf8a6f4bddb47515cc",
+            .hash = "build_crab-0.2.1-V2z3N3C8AACs4k0o56KDamK_ysTvJ4l2zE_IOKU-zKCn",
+        },
+        .compile_commands = .{
+            .url = "git+https://github.com/the-argus/zig-compile-commands#7f501dd7f63af5b40760f2b122eac113b151b3c7",
+            .hash = "zig_compile_commands-0.0.1-OZg5-ULBAABTh3NXO3WXoSUX1474ez0EouuoT2yDANhz",
         },
     },
 }
