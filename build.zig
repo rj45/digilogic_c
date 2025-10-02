@@ -285,12 +285,12 @@ pub fn build(b: *std.Build) void {
 
         switch (target.result.abi) {
             .msvc => {
-                digilogic.linkSystemLibrary("synchronization");
+                digilogic.linkSystemLibrary2("synchronization", .{ .preferred_link_mode = .dynamic });
             },
             .gnu => {
-                digilogic.linkSystemLibrary("API-MS-Win-Core-Synch-l1-2-0"); // required by rust
-                digilogic.linkSystemLibrary("winmm"); // required by rust
-                digilogic.linkSystemLibrary("unwind"); // required by rust
+                digilogic.linkSystemLibrary2("api-ms-win-core-synch-l1-2-0", .{ .preferred_link_mode = .dynamic }); // required by rust
+                digilogic.linkSystemLibrary2("winmm", .{ .preferred_link_mode = .dynamic }); // required by rust
+                digilogic.linkSystemLibrary2("unwind", .{ .preferred_link_mode = .dynamic }); // required by rust
             },
             else => @panic("Unsupported target"),
         }
@@ -446,7 +446,8 @@ pub fn build(b: *std.Build) void {
     targets.append(b.allocator, digilogic_test) catch @panic("OOM");
     targets.append(b.allocator, digilogic_bench) catch @panic("OOM");
 
-    _ = zcc.createStep(b, "cdb", targets.toOwnedSlice(b.allocator) catch @panic("OOM"));
+    var cdb_step = zcc.createStep(b, "cdb", targets.toOwnedSlice(b.allocator) catch @panic("OOM"));
+    cdb_step.dependOn(&digilogic.step);
 }
 
 fn build_nfd(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) *std.Build.Step.Compile {
@@ -495,7 +496,7 @@ fn build_nfd(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.buil
             .flags = cflags,
         });
 
-        nfd.linkSystemLibrary("gtk+-3.0");
+        nfd.linkSystemLibrary2("gtk+-3.0", .{ .preferred_link_mode = .dynamic });
     }
 
     nfd.addCSourceFile(.{
