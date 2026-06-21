@@ -5,6 +5,7 @@ src/apple.m
 build
 zig-cache
 .zig-cache
+zig-pkg
 zig-out
 .cache
 *.dSYM
@@ -19,4 +20,4 @@ untitled.dlc
 .vscode
 routing_data.dat
 compile_commands.json
-.aider*
+
