@@ -50,9 +50,9 @@ pub fn build(b: *std.Build) !void {
             .optimize = .Debug,
         }),
     });
-    fuzz_lib.want_lto = true;
-    fuzz_lib.bundle_compiler_rt = true;
-    fuzz_lib.pie = true;
+    // fuzz_lib.want_lto = true;
+    // fuzz_lib.bundle_compiler_rt = true;
+    // fuzz_lib.pie = true;
 
     const fuzz_executable_name = "fuzz";
     const fuzz_exe_path = try std.fs.path.join(

@@ -24,28 +24,37 @@ pub fn build(b: *std.Build) void {
         .preferred_optimize_mode = .ReleaseFast,
     });
 
+    const digilogic_mod = b.createModule(.{
+        .target = target,
+        .optimize = optimize,
+        .link_libc = true,
+    });
+
     const digilogic = b.addExecutable(.{
         .name = "digilogic",
-        .root_module = b.createModule(.{
-            .target = target,
-            .optimize = optimize,
-        }),
+        .root_module = digilogic_mod,
+    });
+
+    const digilogic_test_mod = b.createModule(.{
+        .target = target,
+        .optimize = optimize,
+        .link_libc = true,
     });
 
     const digilogic_test = b.addExecutable(.{
         .name = "test",
-        .root_module = b.createModule(.{
-            .target = target,
-            .optimize = optimize,
-        }),
+        .root_module = digilogic_test_mod,
+    });
+
+    const digilogic_bench_mod = b.createModule(.{
+        .target = target,
+        .optimize = optimize,
+        .link_libc = true,
     });
 
     const digilogic_bench = b.addExecutable(.{
         .name = "bench",
-        .root_module = b.createModule(.{
-            .target = target,
-            .optimize = optimize,
-        }),
+        .root_module = digilogic_bench_mod,
     });
 
     const Sanitizer = enum {
@@ -63,7 +72,7 @@ pub fn build(b: *std.Build) void {
     cflags.append("-std=gnu11") catch @panic("OOM");
 
     if (optimize == .Debug) {
-        digilogic.root_module.addCMacro("DEBUG", "1");
+        digilogic_mod.addCMacro("DEBUG", "1");
 
         if (target.result.abi == .msvc) {
             cflags.appendSlice(&.{
@@ -101,28 +110,28 @@ pub fn build(b: *std.Build) void {
                         cflags.append("-fsanitize-memory-track-origins=2") catch @panic("OOM");
                     }
 
-                    inline for ([_]*std.Build.Step.Compile{ digilogic, digilogic_test, digilogic_bench }) |exe| {
-                        exe.addLibraryPath(.{ .cwd_relative = llvm_lib_path });
+                    inline for ([_]*std.Build.Module{ digilogic_mod, digilogic_test_mod, digilogic_bench_mod }) |mod| {
+                        mod.addLibraryPath(.{ .cwd_relative = llvm_lib_path });
 
                         if (target.result.os.tag.isDarwin()) {
                             // todo: figure out libraries for other sanitizers
-                            exe.linkSystemLibrary("clang_rt.asan_osx_dynamic");
-                            exe.linkSystemLibrary("clang_rt.ubsan_osx_dynamic");
+                            mod.linkSystemLibrary("clang_rt.asan_osx_dynamic", .{});
+                            mod.linkSystemLibrary("clang_rt.ubsan_osx_dynamic", .{});
                         } else if (target.result.os.tag == .linux) {
                             if (sanitizer == .address) {
-                                exe.linkSystemLibrary("clang_rt.asan_static-x86_64");
-                                exe.linkSystemLibrary("clang_rt.asan-x86_64");
+                                mod.linkSystemLibrary("clang_rt.asan_static-x86_64", .{});
+                                mod.linkSystemLibrary("clang_rt.asan-x86_64", .{});
                             } else if (sanitizer == .memory) {
-                                exe.linkSystemLibrary("clang_rt.msan-x86_64");
+                                mod.linkSystemLibrary("clang_rt.msan-x86_64", .{});
                             } else if (sanitizer == .thread) {
-                                exe.linkSystemLibrary("clang_rt.tsan-x86_64");
+                                mod.linkSystemLibrary("clang_rt.tsan-x86_64", .{});
                             }
-                            exe.linkSystemLibrary("clang_rt.ubsan_standalone-x86_64");
-                            exe.linkSystemLibrary("pthread");
-                            exe.linkSystemLibrary("rt");
-                            exe.linkSystemLibrary("m");
-                            exe.linkSystemLibrary("dl");
-                            exe.linkSystemLibrary("resolv");
+                            mod.linkSystemLibrary("clang_rt.ubsan_standalone-x86_64", .{});
+                            mod.linkSystemLibrary("pthread", .{});
+                            mod.linkSystemLibrary("rt", .{});
+                            mod.linkSystemLibrary("m", .{});
+                            mod.linkSystemLibrary("dl", .{});
+                            mod.linkSystemLibrary("resolv", .{});
                         }
                     }
                 }
@@ -131,8 +140,8 @@ pub fn build(b: *std.Build) void {
     }
 
     // add files common to both the main and test executables
-    inline for ([_]*std.Build.Step.Compile{ digilogic, digilogic_test, digilogic_bench }) |exe| {
-        exe.addCSourceFiles(.{
+    inline for ([_]*std.Build.Module{ digilogic_mod, digilogic_test_mod, digilogic_bench_mod }) |mod| {
+        mod.addCSourceFiles(.{
             .root = b.path("src"),
             .files = &.{
                 "core/save.c",
@@ -151,14 +160,14 @@ pub fn build(b: *std.Build) void {
             },
             .flags = cflags.items,
         });
-        exe.addCSourceFiles(.{
+        mod.addCSourceFiles(.{
             .root = b.path("thirdparty"),
             .files = &.{"yyjson.c"},
             .flags = cflags.items,
         });
     }
 
-    digilogic.addCSourceFiles(.{
+    digilogic_mod.addCSourceFiles(.{
         .root = b.path("src"),
         .files = &.{
             "main.c",
@@ -177,15 +186,15 @@ pub fn build(b: *std.Build) void {
         .name = "gen",
         .root_module = b.createModule(.{
             .target = b.graph.host,
+            .link_libc = true,
         }),
     });
-    asset_gen.addCSourceFile(.{
+    asset_gen.root_module.addCSourceFile(.{
         .file = b.path("src/gen.c"),
         .flags = &.{"-std=gnu11"},
     });
-    asset_gen.addIncludePath(b.path("thirdparty"));
-    asset_gen.addIncludePath(b.path("src"));
-    asset_gen.linkLibC();
+    asset_gen.root_module.addIncludePath(b.path("thirdparty"));
+    asset_gen.root_module.addIncludePath(b.path("src"));
 
     // generate assets.c from assets.zip
     const asset_gen_step = b.addRunArtifact(asset_gen);
@@ -195,24 +204,24 @@ pub fn build(b: *std.Build) void {
     asset_gen_step.addFileArg(b.path("res/assets/testdata/alu_1bit_2inpgate.dig"));
     asset_gen_step.addFileArg(b.path("res/assets/testdata/alu_1bit_2gatemux.dig"));
     const assets_c = asset_gen_step.addOutputFileArg("assets.c");
-    digilogic.addCSourceFile(.{
+    digilogic_mod.addCSourceFile(.{
         .file = assets_c,
         .flags = cflags.items,
     });
 
-    digilogic.addIncludePath(b.path("src"));
-    digilogic.addIncludePath(b.path("thirdparty"));
+    digilogic_mod.addIncludePath(b.path("src"));
+    digilogic_mod.addIncludePath(b.path("thirdparty"));
 
-    digilogic.linkLibC();
+    digilogic_mod.link_libc = true;
 
     const freetype = b.dependency("freetype", .{
         .target = target,
         .optimize = optimize,
     }).artifact("freetype");
-    digilogic.linkLibrary(freetype);
+    digilogic_mod.linkLibrary(freetype);
 
-    digilogic.root_module.addCMacro("NVD_STATIC_LINKAGE", "");
-    digilogic.linkLibrary(build_nfd(b, target, optimize));
+    digilogic_mod.addCMacro("NVD_STATIC_LINKAGE", "");
+    digilogic_mod.linkLibrary(build_nfd(b, target, optimize));
 
     const Renderer = enum {
         metal,
@@ -223,7 +232,7 @@ pub fn build(b: *std.Build) void {
     const renderer = b.option(Renderer, "renderer", "Specify which rendering API to use (not all renderers work on all platforms");
 
     const msaa_sample_count = b.option(u32, "msaa_sample_count", "Number of MSAA samples to use (1 for no MSAA, default 4)") orelse 4;
-    digilogic.root_module.addCMacro("MSAA_SAMPLE_COUNT", b.fmt("{d}", .{msaa_sample_count}));
+    digilogic_mod.addCMacro("MSAA_SAMPLE_COUNT", b.fmt("{d}", .{msaa_sample_count}));
 
     if (target.result.os.tag.isDarwin()) {
         // add apple.m (a copy of nonapple.c) to the build
@@ -232,7 +241,7 @@ pub fn build(b: *std.Build) void {
         mflags2.append("-ObjC") catch @panic("OOM");
         mflags2.append("-fobjc-arc") catch @panic("OOM");
         mflags2.appendSlice(cflags.items) catch @panic("OOM");
-        digilogic.addCSourceFile(.{
+        digilogic_mod.addCSourceFile(.{
             .file = b.addWriteFiles().addCopyFile(b.path("src/nonapple.c"), "apple.m"),
             .flags = mflags2.items,
         });
@@ -241,19 +250,19 @@ pub fn build(b: *std.Build) void {
             @panic("This target supports only -Drenderer=metal");
         }
 
-        digilogic.root_module.addCMacro("SOKOL_METAL", "");
+        digilogic_mod.addCMacro("SOKOL_METAL", "");
 
-        digilogic.linkFramework("Metal");
-        digilogic.linkFramework("MetalKit");
-        digilogic.linkFramework("Quartz");
-        digilogic.linkFramework("Cocoa");
-        digilogic.linkFramework("UniformTypeIdentifiers");
+        digilogic_mod.linkFramework("Metal", .{});
+        digilogic_mod.linkFramework("MetalKit", .{});
+        digilogic_mod.linkFramework("Quartz", .{});
+        digilogic_mod.linkFramework("Cocoa", .{});
+        digilogic_mod.linkFramework("UniformTypeIdentifiers", .{});
     } else if (target.result.os.tag == .windows) {
-        digilogic.addWin32ResourceFile(.{
+        digilogic_mod.addWin32ResourceFile(.{
             .file = b.path("res/app.rc"),
         });
 
-        digilogic.addCSourceFiles(.{
+        digilogic_mod.addCSourceFiles(.{
             .root = b.path("src"),
             .files = &.{
                 "nonapple.c",
@@ -263,34 +272,34 @@ pub fn build(b: *std.Build) void {
 
         switch (renderer orelse .d3d11) {
             .opengl => {
-                digilogic.root_module.addCMacro("SOKOL_GLCORE33", "");
-                digilogic.linkSystemLibrary("opengl32");
+                digilogic_mod.addCMacro("SOKOL_GLCORE33", "");
+                digilogic_mod.linkSystemLibrary("opengl32", .{});
             },
             .d3d11 => {
-                digilogic.root_module.addCMacro("SOKOL_D3D11", "");
-                digilogic.linkSystemLibrary("d3d11");
-                digilogic.linkSystemLibrary("dxgi");
+                digilogic_mod.addCMacro("SOKOL_D3D11", "");
+                digilogic_mod.linkSystemLibrary("d3d11", .{});
+                digilogic_mod.linkSystemLibrary("dxgi", .{});
             },
             else => @panic("This target supports only -Drenderer=d3d11 or -Drenderer=opengl"),
         }
 
-        digilogic.linkSystemLibrary("kernel32");
-        digilogic.linkSystemLibrary("user32");
-        digilogic.linkSystemLibrary("gdi32");
-        digilogic.linkSystemLibrary("ole32");
-        digilogic.linkSystemLibrary("userenv");
-        digilogic.linkSystemLibrary("bcrypt"); // required by rust
-        digilogic.linkSystemLibrary("ws2_32"); // required by rust
-        digilogic.linkSystemLibrary("advapi32"); // required by rust
+        digilogic_mod.linkSystemLibrary("kernel32", .{});
+        digilogic_mod.linkSystemLibrary("user32", .{});
+        digilogic_mod.linkSystemLibrary("gdi32", .{});
+        digilogic_mod.linkSystemLibrary("ole32", .{});
+        digilogic_mod.linkSystemLibrary("userenv", .{});
+        digilogic_mod.linkSystemLibrary("bcrypt", .{}); // required by rust
+        digilogic_mod.linkSystemLibrary("ws2_32", .{}); // required by rust
+        digilogic_mod.linkSystemLibrary("advapi32", .{}); // required by rust
 
         switch (target.result.abi) {
             .msvc => {
-                digilogic.linkSystemLibrary2("synchronization", .{ .preferred_link_mode = .dynamic });
+                digilogic_mod.linkSystemLibrary("synchronization", .{ .preferred_link_mode = .dynamic });
             },
             .gnu => {
-                digilogic.linkSystemLibrary2("api-ms-win-core-synch-l1-2-0", .{ .preferred_link_mode = .dynamic }); // required by rust
-                digilogic.linkSystemLibrary2("winmm", .{ .preferred_link_mode = .dynamic }); // required by rust
-                digilogic.linkSystemLibrary2("unwind", .{ .preferred_link_mode = .dynamic }); // required by rust
+                digilogic_mod.linkSystemLibrary("api-ms-win-core-synch-l1-2-0", .{ .preferred_link_mode = .dynamic }); // required by rust
+                digilogic_mod.linkSystemLibrary("winmm", .{ .preferred_link_mode = .dynamic }); // required by rust
+                digilogic_mod.linkSystemLibrary("unwind", .{ .preferred_link_mode = .dynamic }); // required by rust
             },
             else => @panic("Unsupported target"),
         }
@@ -299,7 +308,7 @@ pub fn build(b: *std.Build) void {
     } else {
         // assuming linux
 
-        digilogic.addCSourceFiles(.{
+        digilogic_mod.addCSourceFiles(.{
             .root = b.path("src"),
             .files = &.{
                 "nonapple.c",
@@ -310,25 +319,25 @@ pub fn build(b: *std.Build) void {
         const use_wayland = b.option(bool, "wayland", "Compile for Wayland instead of X11") orelse false;
 
         switch (renderer orelse .opengl) {
-            .opengl => digilogic.root_module.addCMacro("SOKOL_GLCORE33", ""),
-            .opengles => digilogic.root_module.addCMacro("SOKOL_GLES3", ""),
+            .opengl => digilogic_mod.addCMacro("SOKOL_GLCORE33", ""),
+            .opengles => digilogic_mod.addCMacro("SOKOL_GLES3", ""),
             else => @panic("This target supports only -Drenderer=opengl or -Drenderer=opengles"),
         }
 
-        digilogic.linkSystemLibrary("GL");
+        digilogic_mod.linkSystemLibrary("GL", .{});
 
-        digilogic.linkSystemLibrary("unwind"); // required by rust
-        digilogic_test.linkSystemLibrary("unwind");
+        digilogic_mod.linkSystemLibrary("unwind", .{}); // required by rust
+        digilogic_test.root_module.linkSystemLibrary("unwind", .{});
 
         const use_egl = b.option(bool, "egl", "Force Sokol to use EGL instead of GLX for OpenGL context creation") orelse use_wayland;
         if (use_egl) {
-            digilogic.root_module.addCMacro("SOKOL_FORCE_EGL", "");
-            digilogic.linkSystemLibrary("EGL");
+            digilogic_mod.addCMacro("SOKOL_FORCE_EGL", "");
+            digilogic_mod.linkSystemLibrary("EGL", .{});
         }
 
         if (use_wayland) {
-            digilogic.root_module.addCMacro("SOKOL_DISABLE_X11", "");
-            digilogic.root_module.addCMacro("SOKOL_LINUX_CUSTOM", "");
+            digilogic_mod.addCMacro("SOKOL_DISABLE_X11", "");
+            digilogic_mod.addCMacro("SOKOL_LINUX_CUSTOM", "");
 
             // TODO not sure if this is normally on the path; may need a better autodetection?
             const wayland_scanner_path = b.option([]const u8, "wayland-scanner-path", "Path to the system's wayland-scanner binary, if not on the path") orelse "wayland-scanner";
@@ -345,32 +354,32 @@ pub fn build(b: *std.Build) void {
             }) |source| {
                 const generate_header = b.addSystemCommand(&.{ wayland_scanner_path, "client-header" });
                 generate_header.setStdIn(.{ .lazy_path = b.path(source.xml_path) });
-                const header_file = generate_header.captureStdOut();
+                const header_file = generate_header.captureStdOut(.{});
                 const header_wf = b.addWriteFiles();
                 _ = header_wf.addCopyFile(header_file, source.basename ++ ".h");
 
                 const generate_source = b.addSystemCommand(&.{ wayland_scanner_path, "private-code" });
                 generate_source.setStdIn(.{ .lazy_path = b.path(source.xml_path) });
-                const source_file = generate_source.captureStdOut();
+                const source_file = generate_source.captureStdOut(.{});
 
-                digilogic.addCSourceFile(.{
+                digilogic_mod.addCSourceFile(.{
                     .file = source_file,
                     .flags = cflags.items,
                 });
-                digilogic.addIncludePath(header_wf.getDirectory());
+                digilogic_mod.addIncludePath(header_wf.getDirectory());
             }
 
-            digilogic.linkSystemLibrary("wayland-client");
-            digilogic.linkSystemLibrary("wayland-cursor");
-            digilogic.linkSystemLibrary("wayland-egl");
-            digilogic.linkSystemLibrary("xkbcommon");
+            digilogic_mod.linkSystemLibrary("wayland-client", .{});
+            digilogic_mod.linkSystemLibrary("wayland-cursor", .{});
+            digilogic_mod.linkSystemLibrary("wayland-egl", .{});
+            digilogic_mod.linkSystemLibrary("xkbcommon", .{});
         } else {
             // X11
-            digilogic.root_module.addCMacro("SOKOL_DISABLE_WAYLAND", "1");
+            digilogic_mod.addCMacro("SOKOL_DISABLE_WAYLAND", "1");
 
-            digilogic.linkSystemLibrary("X11");
-            digilogic.linkSystemLibrary("Xi");
-            digilogic.linkSystemLibrary("Xcursor");
+            digilogic_mod.linkSystemLibrary("X11", .{});
+            digilogic_mod.linkSystemLibrary("Xi", .{});
+            digilogic_mod.linkSystemLibrary("Xcursor", .{});
         }
     }
 
@@ -378,7 +387,9 @@ pub fn build(b: *std.Build) void {
         b,
         .{
             .manifest_path = b.path("thirdparty/routing/Cargo.toml"),
-            .cargo_args = &.{},
+            .cargo_args = &.{
+                "--quiet",
+            },
         },
         .{
             .optimize = optimize,
@@ -386,9 +397,9 @@ pub fn build(b: *std.Build) void {
         },
     );
 
-    inline for ([_]*std.Build.Step.Compile{ digilogic, digilogic_test, digilogic_bench }) |exe| {
-        exe.addLibraryPath(crate_artifacts);
-        exe.linkSystemLibrary("digilogic_routing");
+    inline for ([_]*std.Build.Module{ digilogic_mod, digilogic_test_mod, digilogic_bench_mod }) |mod| {
+        mod.addLibraryPath(crate_artifacts);
+        mod.linkSystemLibrary("digilogic_routing", .{});
     }
 
     if (target.result.os.tag.isDarwin()) {
@@ -404,8 +415,7 @@ pub fn build(b: *std.Build) void {
         b.installArtifact(digilogic);
     }
 
-    digilogic_test.linkLibC();
-    digilogic_test.addCSourceFiles(.{
+    digilogic_test_mod.addCSourceFiles(.{
         .root = b.path("src"),
         .files = &.{
             "test.c",
@@ -416,16 +426,15 @@ pub fn build(b: *std.Build) void {
         },
         .flags = cflags.items,
     });
-    digilogic_test.addIncludePath(b.path("src"));
-    digilogic_test.addIncludePath(b.path("thirdparty"));
+    digilogic_test_mod.addIncludePath(b.path("src"));
+    digilogic_test_mod.addIncludePath(b.path("thirdparty"));
 
     const test_run = b.addRunArtifact(digilogic_test);
 
     const test_step = b.step("test", "Build and run tests");
     test_step.dependOn(&test_run.step);
 
-    digilogic_bench.linkLibC();
-    digilogic_bench.addCSourceFiles(.{
+    digilogic_bench_mod.addCSourceFiles(.{
         .root = b.path("src"),
         .files = &.{
             "bench.c",
@@ -433,15 +442,15 @@ pub fn build(b: *std.Build) void {
         },
         .flags = cflags.items,
     });
-    digilogic_bench.addIncludePath(b.path("src"));
-    digilogic_bench.addIncludePath(b.path("thirdparty"));
+    digilogic_bench_mod.addIncludePath(b.path("src"));
+    digilogic_bench_mod.addIncludePath(b.path("thirdparty"));
 
     const bench_run = b.addRunArtifact(digilogic_bench);
 
     const bench_step = b.step("bench", "Build and run benchmarks");
     bench_step.dependOn(&bench_run.step);
 
-    var targets = std.ArrayList(*std.Build.Step.Compile){};
+    var targets = std.ArrayList(*std.Build.Step.Compile).initCapacity(b.allocator, 3) catch @panic("OOM");
     targets.append(b.allocator, digilogic) catch @panic("OOM");
     targets.append(b.allocator, digilogic_test) catch @panic("OOM");
     targets.append(b.allocator, digilogic_bench) catch @panic("OOM");
@@ -451,13 +460,16 @@ pub fn build(b: *std.Build) void {
 }
 
 fn build_nfd(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) *std.Build.Step.Compile {
+    const nfd_mod = b.createModule(.{
+        .target = target,
+        .optimize = optimize,
+        .link_libc = true,
+    });
+
     const nfd = b.addLibrary(.{
         .name = "nfd",
         .linkage = .static,
-        .root_module = b.createModule(.{
-            .target = target,
-            .optimize = optimize,
-        }),
+        .root_module = nfd_mod,
     });
 
     const cflags = &.{
@@ -466,40 +478,38 @@ fn build_nfd(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.buil
         "-fno-exceptions",
     };
 
-    nfd.addIncludePath(b.path("thirdparty/nfd/include"));
-    nfd.addIncludePath(b.path("thirdparty/nfd"));
-
-    nfd.linkLibC();
+    nfd_mod.addIncludePath(b.path("thirdparty/nfd/include"));
+    nfd_mod.addIncludePath(b.path("thirdparty/nfd"));
 
     if (target.result.os.tag.isDarwin()) {
-        nfd.addCSourceFile(.{
+        nfd_mod.addCSourceFile(.{
             .file = b.path("thirdparty/nfd/nfd_cocoa.m"),
             .flags = cflags,
         });
 
-        nfd.linkFramework("AppKit");
-        nfd.linkFramework("Cocoa");
-        nfd.linkFramework("Foundation");
-        nfd.linkFramework("UserNotifications");
+        nfd_mod.linkFramework("AppKit", .{});
+        nfd_mod.linkFramework("Cocoa", .{});
+        nfd_mod.linkFramework("Foundation", .{});
+        nfd_mod.linkFramework("UserNotifications", .{});
     } else if (target.result.os.tag == .windows) {
-        nfd.addCSourceFile(.{
+        nfd_mod.addCSourceFile(.{
             .file = b.path("thirdparty/nfd/nfd_win.cpp"),
             .flags = cflags,
         });
 
-        nfd.linkSystemLibrary("comdlg32");
-        // nfd.linkSystemLibrary("shell32");
-        // nfd.linkSystemLibrary("user32");
+        nfd_mod.linkSystemLibrary("comdlg32", .{});
+        // nfd_mod.linkSystemLibrary("shell32", .{});
+        // nfd_mod.linkSystemLibrary("user32", .{});
     } else {
-        nfd.addCSourceFile(.{
+        nfd_mod.addCSourceFile(.{
             .file = b.path("thirdparty/nfd/nfd_gtk.c"),
             .flags = cflags,
         });
 
-        nfd.linkSystemLibrary2("gtk+-3.0", .{ .preferred_link_mode = .dynamic });
+        nfd_mod.linkSystemLibrary("gtk+-3.0", .{ .preferred_link_mode = .dynamic });
     }
 
-    nfd.addCSourceFile(.{
+    nfd_mod.addCSourceFile(.{
         .file = b.path("thirdparty/nfd/nfd_common.c"),
         .flags = cflags,
     });
@@ -511,24 +521,27 @@ fn build_nfd(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.buil
 
 fn find_llvm_lib_path(b: *std.Build) ?[]const u8 {
     const zig_version = @import("builtin").zig_version;
-    const llvm_version = if (zig_version.major == 0 and zig_version.minor < 13) 17 else 18;
+    const llvm_version = if (zig_version.major == 0 and zig_version.minor == 16) 21 else 22;
 
     var base_path: []const u8 = undefined;
     var glob_pattern: []const u8 = undefined;
 
+    // FIXME: does std.Build not have an io reference from somewhere??? I was expecting `b.io` to work!
+    var single_threaded_io = std.Io.Threaded.init_single_threaded;
+    const io = single_threaded_io.io();
+
     if (b.graph.host.result.os.tag.isDarwin()) {
         glob_pattern = b.fmt("llvm@{}/*/lib/clang/*/lib/darwin", .{llvm_version});
-        const result = std.process.Child.run(.{
-            .allocator = b.allocator,
+        const result = std.process.run(b.allocator, io, .{
             .argv = &.{
                 "brew",
                 "--cellar",
             },
-            .cwd = b.pathFromRoot("."),
+            .cwd = .{.path = b.pathFromRoot(".")},
             .expand_arg0 = .expand,
         }) catch return null;
         switch (result.term) {
-            .Exited => |status| if (status != 0) return null,
+            .exited => |status| if (status != 0) return null,
             else => return null,
         }
         base_path = std.mem.trim(u8, result.stdout, &std.ascii.whitespace);
@@ -539,11 +552,11 @@ fn find_llvm_lib_path(b: *std.Build) ?[]const u8 {
         base_path = "/usr/lib";
     }
 
-    var base_dir = std.fs.cwd().openDir(base_path, .{ .iterate = true }) catch return null;
-    defer base_dir.close();
+    var base_dir = std.Io.Dir.cwd().openDir(io, base_path, .{ .iterate = true }) catch return null;
+    defer base_dir.close(io);
 
     var iter = base_dir.walk(b.allocator) catch return null;
-    while (iter.next() catch return null) |entry| {
+    while (iter.next(io) catch return null) |entry| {
         if (entry.kind == .directory and globlin.match(glob_pattern, entry.path)) {
             return std.fs.path.join(b.allocator, &.{ base_path, entry.path }) catch @panic("OOM");
         }

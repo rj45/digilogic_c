@@ -4,24 +4,26 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
+    const lib_mod = b.createModule(.{
+        .target = target,
+        .optimize = optimize,
+        .link_libc = true,
+    });
+
     const lib = b.addLibrary(.{
         .name = "brotli",
         .linkage = .static,
-        .root_module = b.createModule(.{
-            .target = target,
-            .optimize = optimize,
-        }),
+        .root_module = lib_mod,
     });
 
-    lib.linkLibC();
-    lib.addIncludePath(b.path("c/include"));
-    lib.addCSourceFiles(.{ .files = &sources, .flags = &.{} });
+    lib_mod.addIncludePath(b.path("c/include"));
+    lib_mod.addCSourceFiles(.{ .files = &sources, .flags = &.{} });
     lib.installHeadersDirectory(b.path("c/include/brotli"), "brotli", .{});
 
     switch (target.result.os.tag) {
-        .linux => lib.root_module.addCMacro("OS_LINUX", "1"),
-        .freebsd => lib.root_module.addCMacro("OS_FREEBSD", "1"),
-        .macos => lib.root_module.addCMacro("OS_MACOSX", "1"),
+        .linux => lib_mod.addCMacro("OS_LINUX", "1"),
+        .freebsd => lib_mod.addCMacro("OS_FREEBSD", "1"),
+        .macos => lib_mod.addCMacro("OS_MACOSX", "1"),
         else => {},
     }
 

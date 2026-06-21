@@ -7,33 +7,35 @@ pub fn build(b: *std.Build) void {
     const use_system_zlib = b.option(bool, "use_system_zlib", "Use system zlib") orelse false;
     const enable_brotli = b.option(bool, "enable_brotli", "Build Brotli") orelse true;
 
+    const lib_mod = b.createModule(.{
+        .target = target,
+        .optimize = optimize,
+        .link_libc = true,
+    });
+
     const lib = b.addLibrary(.{
         .name = "freetype",
         .linkage = .static,
-        .root_module = b.createModule(.{
-            .target = target,
-            .optimize = optimize,
-        }),
+        .root_module = lib_mod,
     });
-    lib.linkLibC();
-    lib.addIncludePath(b.path("include"));
-    lib.root_module.addCMacro("FT2_BUILD_LIBRARY", "1");
+    lib_mod.addIncludePath(b.path("include"));
+    lib_mod.addCMacro("FT2_BUILD_LIBRARY", "1");
 
     if (use_system_zlib) {
-        lib.root_module.addCMacro("FT_CONFIG_OPTION_SYSTEM_ZLIB", "1");
+        lib_mod.addCMacro("FT_CONFIG_OPTION_SYSTEM_ZLIB", "1");
     }
 
     if (enable_brotli) {
-        lib.root_module.addCMacro("FT_CONFIG_OPTION_USE_BROTLI", "1");
+        lib_mod.addCMacro("FT_CONFIG_OPTION_USE_BROTLI", "1");
         if (b.lazyDependency("brotli", .{
             .target = target,
             .optimize = optimize,
-        })) |dep| lib.linkLibrary(dep.artifact("brotli"));
+        })) |dep| lib_mod.linkLibrary(dep.artifact("brotli"));
     }
 
-    lib.root_module.addCMacro("HAVE_UNISTD_H", "1");
-    lib.addCSourceFiles(.{ .files = &sources, .flags = &.{} });
-    if (target.result.os.tag == .macos) lib.addCSourceFile(.{
+    lib_mod.addCMacro("HAVE_UNISTD_H", "1");
+    lib_mod.addCSourceFiles(.{ .files = &sources, .flags = &.{} });
+    if (target.result.os.tag == .macos) lib_mod.addCSourceFile(.{
         .file = b.path("src/base/ftmac.c"),
         .flags = &.{},
     });

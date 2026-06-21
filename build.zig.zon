@@ -2,7 +2,7 @@
     .name = .digilogic,
     .version = "0.0.20",
     .fingerprint = 0x5b5313dfd9eb08ea,
-    .minimum_zig_version = "0.15.1",
+    .minimum_zig_version = "0.16.0",
     .paths = .{""},
     .dependencies = .{
         .freetype = .{
@@ -12,12 +12,12 @@
             .path = "zig-build/globlin",
         },
         .build_crab = .{
-            .url = "git+https://github.com/akarpovskii/build.crab#02ffb1e8f4c72e75289614cf8a6f4bddb47515cc",
-            .hash = "build_crab-0.2.1-V2z3N3C8AACs4k0o56KDamK_ysTvJ4l2zE_IOKU-zKCn",
+            .url = "git+https://github.com/akarpovskii/build.crab#ada65dd868aa6c02e51cd4063cddadcc2d8e3703",
+            .hash = "build_crab-0.3.0-V2z3NyyVAADLPwokqPtP7UkThnD2M-lVxU5ypeZNw6-G",
         },
         .compile_commands = .{
-            .url = "git+https://github.com/the-argus/zig-compile-commands#7f501dd7f63af5b40760f2b122eac113b151b3c7",
-            .hash = "zig_compile_commands-0.0.1-OZg5-ULBAABTh3NXO3WXoSUX1474ez0EouuoT2yDANhz",
+            .url = "https://github.com/the-argus/zig-compile-commands/archive/9400cd1963ea6bb58fe47ba7d9700075b808cdd2.tar.gz",
+            .hash = "zig_compile_commands-0.0.1-OZg5-e_JAAAGg1WHAePtq4l4Uvjs34BexnFFCZk63EaG",
         },
     },
 }
