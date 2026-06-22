@@ -250,7 +250,7 @@ pub fn build(b: *std.Build) void {
             @panic("This target supports only -Drenderer=metal");
         }
 
-        digilogic_mod.addCMacro("SOKOL_METAL", "");
+        digilogic_mod.addCMacro("SOKOL_METAL", "1");
 
         digilogic_mod.linkFramework("Metal", .{});
         digilogic_mod.linkFramework("MetalKit", .{});
@@ -272,11 +272,11 @@ pub fn build(b: *std.Build) void {
 
         switch (renderer orelse .d3d11) {
             .opengl => {
-                digilogic_mod.addCMacro("SOKOL_GLCORE33", "");
+                digilogic_mod.addCMacro("SOKOL_GLCORE33", "1");
                 digilogic_mod.linkSystemLibrary("opengl32", .{});
             },
             .d3d11 => {
-                digilogic_mod.addCMacro("SOKOL_D3D11", "");
+                digilogic_mod.addCMacro("SOKOL_D3D11", "1");
                 digilogic_mod.linkSystemLibrary("d3d11", .{});
                 digilogic_mod.linkSystemLibrary("dxgi", .{});
             },
@@ -319,8 +319,8 @@ pub fn build(b: *std.Build) void {
         const use_wayland = b.option(bool, "wayland", "Compile for Wayland instead of X11") orelse false;
 
         switch (renderer orelse .opengl) {
-            .opengl => digilogic_mod.addCMacro("SOKOL_GLCORE33", ""),
-            .opengles => digilogic_mod.addCMacro("SOKOL_GLES3", ""),
+            .opengl => digilogic_mod.addCMacro("SOKOL_GLCORE33", "1"),
+            .opengles => digilogic_mod.addCMacro("SOKOL_GLES3", "1"),
             else => @panic("This target supports only -Drenderer=opengl or -Drenderer=opengles"),
         }
 
@@ -331,13 +331,13 @@ pub fn build(b: *std.Build) void {
 
         const use_egl = b.option(bool, "egl", "Force Sokol to use EGL instead of GLX for OpenGL context creation") orelse use_wayland;
         if (use_egl) {
-            digilogic_mod.addCMacro("SOKOL_FORCE_EGL", "");
+            digilogic_mod.addCMacro("SOKOL_FORCE_EGL", "1");
             digilogic_mod.linkSystemLibrary("EGL", .{});
         }
 
         if (use_wayland) {
-            digilogic_mod.addCMacro("SOKOL_DISABLE_X11", "");
-            digilogic_mod.addCMacro("SOKOL_LINUX_CUSTOM", "");
+            digilogic_mod.addCMacro("SOKOL_DISABLE_X11", "1");
+            digilogic_mod.addCMacro("SOKOL_LINUX_CUSTOM", "1");
 
             // TODO not sure if this is normally on the path; may need a better autodetection?
             const wayland_scanner_path = b.option([]const u8, "wayland-scanner-path", "Path to the system's wayland-scanner binary, if not on the path") orelse "wayland-scanner";

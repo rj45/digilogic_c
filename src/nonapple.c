@@ -53,7 +53,7 @@
 
 static char locale[64];
 static char resourcePath[PATH_MAX];
-static char dataPath[PATH_MAX];
+static char dataPath[PATH_MAX-13];
 static char cachePath[PATH_MAX];
 static char autosavePath[PATH_MAX];
 
@@ -65,11 +65,12 @@ void platform_init() {
     resourcePath[len] = FC_DIRECTORY_SEPARATOR;
     resourcePath[len + 1] = '\0';
   }
-  fc_datadir("digilogic", dataPath, PATH_MAX);
-  if (dataPath[strlen(dataPath) - 1] != FC_DIRECTORY_SEPARATOR) {
-    int len = strlen(dataPath);
+  fc_datadir("digilogic", dataPath, PATH_MAX-13);
+  int len = strlen(dataPath);
+  if (dataPath[len - 1] != FC_DIRECTORY_SEPARATOR) {
     dataPath[len] = FC_DIRECTORY_SEPARATOR;
     dataPath[len + 1] = '\0';
+    len += 1;
   }
   fc_cachedir("digilogic", cachePath, PATH_MAX);
   if (cachePath[strlen(cachePath) - 1] != FC_DIRECTORY_SEPARATOR) {
